@@ -26,12 +26,18 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.androidthings.imageclassifier.classifier.Recognition;
+import com.example.androidthings.imageclassifier.classifier.TensorFlowHelper;
 import com.google.android.things.contrib.driver.button.ButtonInputDriver;
 import com.google.android.things.contrib.driver.rainbowhat.RainbowHat;
 
+import org.tensorflow.lite.Interpreter;
+
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 
 public class ImageClassifierActivity extends Activity {
     private static final String TAG = "ImageClassifierActivity";
@@ -55,6 +61,9 @@ public class ImageClassifierActivity extends Activity {
     private ImageView mImage;
     private TextView mResultText;
 
+    private Interpreter mTensorFlowLite;
+    private List<String> mLabels;
+
     // TODO: ADD ARTIFICIAL INTELLIGENCE
     // TODO: ADD CAMERA SUPPORT
 
@@ -62,14 +71,20 @@ public class ImageClassifierActivity extends Activity {
      * Initialize the classifier that will be used to process images.
      */
     private void initClassifier() {
-        // TODO: ADD ARTIFICIAL INTELLIGENCE
+        try {
+            mTensorFlowLite =
+                    new Interpreter(TensorFlowHelper.loadModelFile(this, MODEL_FILE));
+            mLabels = TensorFlowHelper.readLabels(this, LABELS_FILE);
+        } catch (IOException e) {
+            Log.w(TAG, "Unable to initialize TensorFlow Lite.", e);
+        }
     }
 
     /**
      * Clean up the resources used by the classifier.
      */
     private void destroyClassifier() {
-        // TODO: ADD ARTIFICIAL INTELLIGENCE
+        mTensorFlowLite.close();
     }
 
     /**
@@ -83,8 +98,25 @@ public class ImageClassifierActivity extends Activity {
      *              and power consuming.
      */
     private void doRecognize(Bitmap image) {
-        // TODO: ADD ARTIFICIAL INTELLIGENCE
-        Collection<Recognition> results = null;
+        // Allocate space for the inference results
+        byte[][] confidencePerLabel = new byte[1][mLabels.size()];
+        // Allocate buffer for image pixels.
+        int[] intValues = new int[TF_INPUT_IMAGE_WIDTH * TF_INPUT_IMAGE_HEIGHT];
+        ByteBuffer imgData = ByteBuffer.allocateDirect(
+                DIM_BATCH_SIZE * TF_INPUT_IMAGE_WIDTH * TF_INPUT_IMAGE_HEIGHT * DIM_PIXEL_SIZE);
+        imgData.order(ByteOrder.nativeOrder());
+
+        // Read image data into buffer formatted for the TensorFlow model
+        TensorFlowHelper.convertBitmapToByteBuffer(image, intValues, imgData);
+
+        // Run inference on the network with the image bytes in imgData as input,
+        // storing results on the confidencePerLabel array.
+        mTensorFlowLite.run(imgData, confidencePerLabel);
+
+        // Get the results with the highest confidence and map them to their labels
+        Collection<Recognition> results =
+                TensorFlowHelper.getBestResults(confidencePerLabel, mLabels);
+        // Report the results with the highest confidence
         onPhotoRecognitionReady(results);
     }
 
