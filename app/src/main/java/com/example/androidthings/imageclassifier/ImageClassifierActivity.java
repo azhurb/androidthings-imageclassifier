@@ -18,6 +18,7 @@ package com.example.androidthings.imageclassifier;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ImageReader;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -64,8 +65,8 @@ public class ImageClassifierActivity extends Activity {
     private Interpreter mTensorFlowLite;
     private List<String> mLabels;
 
-    // TODO: ADD ARTIFICIAL INTELLIGENCE
-    // TODO: ADD CAMERA SUPPORT
+    private CameraHandler mCameraHandler;
+    private ImagePreprocessor mImagePreprocessor;
 
     /**
      * Initialize the classifier that will be used to process images.
@@ -124,14 +125,26 @@ public class ImageClassifierActivity extends Activity {
      * Initialize the camera that will be used to capture images.
      */
     private void initCamera() {
-        // TODO: ADD CAMERA SUPPORT
+        mImagePreprocessor = new ImagePreprocessor(
+                PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT,
+                TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
+        mCameraHandler = CameraHandler.getInstance();
+        mCameraHandler.initializeCamera(this,
+                PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT, null,
+                new ImageReader.OnImageAvailableListener() {
+                    @Override
+                    public void onImageAvailable(ImageReader imageReader) {
+                        Bitmap bitmap = mImagePreprocessor.preprocessImage(imageReader.acquireNextImage());
+                        onPhotoReady(bitmap);
+                    }
+                });
     }
 
     /**
      * Clean up resources used by the camera.
      */
     private void closeCamera() {
-        // TODO: ADD CAMERA SUPPORT
+        mCameraHandler.shutDown();
     }
 
     /**
@@ -139,9 +152,7 @@ public class ImageClassifierActivity extends Activity {
      * When done, the method {@link #onPhotoReady(Bitmap)} must be called with the image.
      */
     private void loadPhoto() {
-        // TODO: ADD CAMERA SUPPORT
-        Bitmap bitmap = getStaticBitmap();
-        onPhotoReady(bitmap);
+        mCameraHandler.takePicture();
     }
 
 
